@@ -94,6 +94,8 @@ colnames(prot1_met_img_female_fold1) <- "eid"
 colnames(prot1_met_img_female_fold2) <- "eid"
 colnames(prot1_met_img_male_fold1) <- "eid"
 colnames(prot1_met_img_male_fold2) <- "eid"
+colnames(prot2_img_female) <- "eid"
+colnames(prot2_img_male) <- "eid"
 
 write.csv(prot1_img_female_fold1, "Data/00_Preprocessing/Single_prot_f/fold1/cohort.csv", row.names=F)
 write.csv(prot1_img_female_fold2, "Data/00_Preprocessing/Single_prot_f/fold2/cohort.csv", row.names=F)
