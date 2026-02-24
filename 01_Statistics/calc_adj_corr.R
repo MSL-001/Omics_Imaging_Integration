@@ -1,3 +1,10 @@
+args <- commandArgs(trailingOnly = TRUE)
+
+input_omic_path <- args[1]
+input_image_path <- args[2]
+output_name <- args[3]
+
+
 if(!require("ppcor")){
   install.packages("ppcor", repos='http://cran.us.r-project.org')
   library(ppcor)
@@ -9,7 +16,7 @@ calc_statistics <- function(omic, img, df, covars) {
   ok <- complete.cases(d)
 
   n_used <- sum(ok)
-  if (n_used > 20) {
+  if (n_used >= 20) {
     corr <- cor(df[[omic]], df[[img]], use = "complete.obs")
 
     d <- d[ok, , drop = FALSE]
@@ -35,15 +42,18 @@ calc_statistics <- function(omic, img, df, covars) {
 
 }
 
-proteomics <- read.csv("proteomics_data.csv")
-image_features <- read.csv("volume_data.csv")
+omics <- read.csv(input_omic_path)
+img_features <- read.csv(input_image_path)
 age_data <- read.csv("age_data.csv")
 
-joinedx <- merge(age_data, proteomics, by="eid")
-joined <- merge(joinedx, image_features, by="eid")
 
-omic_cols <- setdiff(colnames(proteomics), "eid")
-img_cols  <- setdiff(colnames(image_features), c("eid", "sex", "bmi"))
+joinedx <- merge(age_data, omics, by="eid")
+joined <- merge(joinedx, img_features, by="eid")
+
+omic_cols <- setdiff(colnames(omics), "eid")
+img_cols  <- setdiff(colnames(img_features), "eid")
+
+
 covars <- c("age_0", "age_2")
 
 joined[img_cols] <- lapply(joined[img_cols], function(x) {
@@ -57,9 +67,6 @@ joined[omic_cols] <- lapply(joined[omic_cols], function(x) {
   if (is.na(s) || s == 0) return(x)
   (x - mean(x, na.rm = TRUE)) / s
 })
-
-
-
 
 omics_feat <- c()
 img_feat <- c()
@@ -82,9 +89,7 @@ for (omic in omic_cols){
       p_value <- c(p_value, res$p)
     }
   }
-
 }
-
 
 df <- data.frame(
   "Omics_Feature" = omics_feat,
@@ -97,6 +102,7 @@ df <- data.frame(
 
 df$q_value <- p.adjust(df$`P_value`, method = "BH")
 
+df <- df[, names(df) != "P_value", drop = FALSE]
 
-write.csv(df, "correlations_adj.csv", row.names = F)
+write.csv(df, output_name, row.names = F)
 
