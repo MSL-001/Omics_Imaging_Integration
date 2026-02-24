@@ -8,7 +8,7 @@ path_1prot <- "Data/00_Preprocessing/proteomics_b0-6_eids.csv"
 
 path_met <- "Data/00_Preprocessing/metabolomics_ids.csv"
 
-
+set.seed(123)
 
 
 female_img_participants <- 
@@ -64,23 +64,49 @@ length(prot2_met_img_female)
 length(prot1_met_img_male)
 length(prot1_met_img_female)
 
-prot1_img_female_fold1 <- data.frame(sample(prot1_img_female, length(prot1_img_female)/2, replace=F))
-prot1_img_female_fold2 <- data.frame(setdiff(prot1_img_female, prot1_img_female_fold1))
+generate_folds <- function(eid_list){
+  n <- length(eid_list)
 
-prot1_img_male_fold1 <- data.frame(sample(prot1_img_male, length(prot1_img_male)/2, replace=F))
-prot1_img_male_fold2 <- data.frame(setdiff(prot1_img_male, prot1_img_male_fold1))
+  fold_idx <- sample(seq_len(n), size = floor(n/2), replace = FALSE)
 
-met_img_female_fold1 <- data.frame(sample(met_img_female, length(met_img_female)/2, replace=F))
-met_img_female_fold2 <- data.frame(setdiff(met_img_female, met_img_female_fold1))
+  fold1 <- data.frame(eid_list[fold_idx])
+  fold2 <- data.frame(eid_list[-fold_idx])
+  return(list(fold1 = fold1,
+              fold2 = fold2))
+}
+folds <- generate_folds(prot1_img_female)
 
-met_img_male_fold1 <- data.frame(sample(met_img_male, length(met_img_male)/2, replace=F))
-met_img_male_fold2 <- data.frame(setdiff(met_img_male, met_img_male_fold1))
+prot1_img_female_fold1 <- folds$fold1
+prot1_img_female_fold2 <- folds$fold2
 
-prot1_met_img_female_fold1 <- data.frame(sample(prot1_met_img_female, length(prot1_met_img_female)/2, replace=F))
-prot1_met_img_female_fold2 <- data.frame(setdiff(prot1_met_img_female, prot1_met_img_female_fold1))
+folds <- generate_folds(prot1_img_male)
 
-prot1_met_img_male_fold1 <- data.frame(sample(prot1_met_img_male, length(prot1_met_img_male)/2, replace=F))
-prot1_met_img_male_fold2 <- data.frame(setdiff(prot1_met_img_male, prot1_met_img_male_fold1))
+prot1_img_male_fold1 <- folds$fold1
+prot1_img_male_fold2 <- folds$fold2
+
+folds <- generate_folds(met_img_female)
+
+met_img_female_fold1 <- folds$fold1
+met_img_female_fold2 <- folds$fold2
+
+folds <- generate_folds(met_img_male)
+
+met_img_male_fold1 <- folds$fold1
+met_img_male_fold2 <- folds$fold2
+
+folds <- generate_folds(prot1_met_img_female)
+
+prot1_met_img_female_fold1 <- folds$fold1
+prot1_met_img_female_fold2 <- folds$fold2
+
+folds <- generate_folds(prot1_met_img_male)
+
+prot1_met_img_male_fold1 <- folds$fold1
+prot1_met_img_male_fold2 <- folds$fold2
+
+prot2_img_male <- data.frame(prot2_img_male)
+prot2_img_female <- data.frame(prot2_img_female)
+
 
 colnames(prot1_img_female_fold1) <- "eid"
 colnames(prot1_img_female_fold2) <- "eid"
