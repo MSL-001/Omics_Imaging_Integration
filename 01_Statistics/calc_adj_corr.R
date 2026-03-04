@@ -53,20 +53,19 @@ joined <- merge(joinedx, img_features, by="eid")
 omic_cols <- setdiff(colnames(omics), "eid")
 img_cols  <- setdiff(colnames(img_features), "eid")
 
+covars <- c("age_0", "age_between")
 
-covars <- c("age_0", "age_2")
-
-joined[img_cols] <- lapply(joined[img_cols], function(x) {
-  s <- sd(x, na.rm = TRUE)
-  if (is.na(s) || s == 0) return(x)
-  (x - mean(x, na.rm = TRUE)) / s
-})
-
-joined[omic_cols] <- lapply(joined[omic_cols], function(x) {
-  s <- sd(x, na.rm = TRUE)
-  if (is.na(s) || s == 0) return(x)
-  (x - mean(x, na.rm = TRUE)) / s
-})
+# joined[img_cols] <- lapply(joined[img_cols], function(x) {
+#   s <- sd(x, na.rm = TRUE)
+#   if (is.na(s) || s == 0) return(x)
+#   (x - mean(x, na.rm = TRUE)) / s
+# })
+#
+# joined[omic_cols] <- lapply(joined[omic_cols], function(x) {
+#   s <- sd(x, na.rm = TRUE)
+#   if (is.na(s) || s == 0) return(x)
+#   (x - mean(x, na.rm = TRUE)) / s
+# })
 
 omics_feat <- c()
 img_feat <- c()
