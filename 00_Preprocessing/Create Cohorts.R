@@ -51,96 +51,75 @@ prot1_img_female <- intersect(single_prot_participants$eid, female_img_participa
 prot1_met_img_male <- intersect(prot1_img_male, met_img_male)
 prot1_met_img_female <- intersect(prot1_img_female, met_img_female)
 
-length(met_img_male)
-length(met_img_female)
 
-length(prot2_img_male)
-length(prot2_img_female)
-length(prot1_img_male)
-length(prot1_img_female)
-
-length(prot2_met_img_male)
-length(prot2_met_img_female)
-length(prot1_met_img_male)
-length(prot1_met_img_female)
-
-generate_folds <- function(eid_list){
+split_test_train <- function(eid_list, fraction){
   n <- length(eid_list)
 
-  fold_idx <- sample(seq_len(n), size = floor(n/2), replace = FALSE)
+  fold_idx <- sample(seq_len(n), size = floor(n*fraction), replace = FALSE)
 
-  fold1 <- data.frame(eid_list[fold_idx])
-  fold2 <- data.frame(eid_list[-fold_idx])
-  return(list(fold1 = fold1,
-              fold2 = fold2))
+  test <- data.frame(eid_list[fold_idx])
+  train <- data.frame(eid_list[-fold_idx])
+  return(list(test = test,
+              train = train))
 }
-folds <- generate_folds(prot1_img_female)
 
-prot1_img_female_fold1 <- folds$fold1
-prot1_img_female_fold2 <- folds$fold2
+fraction <- 0.1
 
-folds <- generate_folds(prot1_img_male)
+folds <- split_test_train(prot1_img_female, fraction)
 
-prot1_img_male_fold1 <- folds$fold1
-prot1_img_male_fold2 <- folds$fold2
+prot1_img_female_test <- folds$test
+prot1_img_female_train <- folds$train
 
-folds <- generate_folds(met_img_female)
+folds <- split_test_train(prot1_img_male, fraction)
 
-met_img_female_fold1 <- folds$fold1
-met_img_female_fold2 <- folds$fold2
+prot1_img_male_test <- folds$test
+prot1_img_male_train <- folds$train
 
-folds <- generate_folds(met_img_male)
+folds <- split_test_train(prot1_met_img_female, fraction)
 
-met_img_male_fold1 <- folds$fold1
-met_img_male_fold2 <- folds$fold2
+prot1_met_img_female_test <- folds$test
+prot1_met_img_female_train <- folds$train
 
-folds <- generate_folds(prot1_met_img_female)
+folds <- split_test_train(prot1_met_img_male, fraction)
 
-prot1_met_img_female_fold1 <- folds$fold1
-prot1_met_img_female_fold2 <- folds$fold2
+prot1_met_img_male_test <- folds$test
+prot1_met_img_male_train <- folds$train
 
-folds <- generate_folds(prot1_met_img_male)
+folds <- split_test_train(met_img_female, fraction)
 
-prot1_met_img_male_fold1 <- folds$fold1
-prot1_met_img_male_fold2 <- folds$fold2
+met_img_female_test <- folds$test
+met_img_female_train <- folds$train
 
-prot2_img_male <- data.frame(prot2_img_male)
-prot2_img_female <- data.frame(prot2_img_female)
+folds <- split_test_train(met_img_male, fraction)
 
+met_img_male_test <- folds$test
+met_img_male_train <- folds$train
 
-colnames(prot1_img_female_fold1) <- "eid"
-colnames(prot1_img_female_fold2) <- "eid"
-colnames(prot1_img_male_fold1) <- "eid"
-colnames(prot1_img_male_fold2) <- "eid"
-colnames(met_img_female_fold1) <- "eid"
-colnames(met_img_female_fold2) <- "eid"
-colnames(met_img_male_fold1) <- "eid"
-colnames(met_img_male_fold2) <- "eid"
-colnames(prot1_met_img_female_fold1) <- "eid"
-colnames(prot1_met_img_female_fold2) <- "eid"
-colnames(prot1_met_img_male_fold1) <- "eid"
-colnames(prot1_met_img_male_fold2) <- "eid"
-colnames(prot2_img_female) <- "eid"
-colnames(prot2_img_male) <- "eid"
-
-write.csv(prot1_img_female_fold1, "Data/00_Preprocessing/Single_prot_f/fold1/cohort.csv", row.names=F)
-write.csv(prot1_img_female_fold2, "Data/00_Preprocessing/Single_prot_f/fold2/cohort.csv", row.names=F)
-
-write.csv(prot1_img_male_fold1, "Data/00_Preprocessing/Single_prot_m/fold1/cohort.csv", row.names=F)
-write.csv(prot1_img_male_fold2, "Data/00_Preprocessing/Single_prot_m/fold2/cohort.csv", row.names=F)
-
-write.csv(prot2_img_female, "Data/00_Preprocessing/Double_prot_f/cohort.csv", row.names=F)
-write.csv(prot2_img_male, "Data/00_Preprocessing/Double_prot_m/cohort.csv", row.names=F)
+colnames(prot1_img_female_test) <- "eid"
+colnames(prot1_img_female_train) <- "eid"
+colnames(prot1_img_male_test) <- "eid"
+colnames(prot1_img_male_train) <- "eid"
+colnames(met_img_female_test) <- "eid"
+colnames(met_img_female_train) <- "eid"
+colnames(met_img_male_test) <- "eid"
+colnames(met_img_male_train) <- "eid"
+colnames(prot1_met_img_female_test) <- "eid"
+colnames(prot1_met_img_female_train) <- "eid"
+colnames(prot1_met_img_male_test) <- "eid"
+colnames(prot1_met_img_male_train) <- "eid"
 
 
-write.csv(met_img_female_fold1, "Data/00_Preprocessing/Met_f/fold1/cohort.csv", row.names=F)
-write.csv(met_img_female_fold2, "Data/00_Preprocessing/Met_f/fold2/cohort.csv", row.names=F)
+write.csv(prot1_img_female_test, "Data/00_Preprocessing/Single_prot_f/test_cohort.csv", row.names=F)
+write.csv(prot1_img_female_train, "Data/00_Preprocessing/Single_prot_f/train_cohort.csv", row.names=F)
+write.csv(prot1_img_male_test, "Data/00_Preprocessing/Single_prot_m/test_cohort.csv", row.names=F)
+write.csv(prot1_img_male_train, "Data/00_Preprocessing/Single_prot_m/train_cohort.csv", row.names=F)
 
-write.csv(met_img_male_fold1, "Data/00_Preprocessing/Met_m/fold1/cohort.csv", row.names=F)
-write.csv(met_img_male_fold2, "Data/00_Preprocessing/Met_m/fold2/cohort.csv", row.names=F)
+write.csv(prot1_met_img_female_test, "Data/00_Preprocessing/Met_prot_f/test_cohort.csv", row.names=F)
+write.csv(prot1_met_img_female_train, "Data/00_Preprocessing/Met_prot_f/train_cohort.csv", row.names=F)
+write.csv(prot1_met_img_male_test, "Data/00_Preprocessing/Met_prot_m/test_cohort.csv", row.names=F)
+write.csv(prot1_met_img_male_train, "Data/00_Preprocessing/Met_prot_m/train_cohort.csv", row.names=F)
 
-write.csv(prot1_met_img_female_fold1, "Data/00_Preprocessing/Met_prot_f/fold1/cohort.csv", row.names=F)
-write.csv(prot1_met_img_female_fold2, "Data/00_Preprocessing/Met_prot_f/fold2/cohort.csv", row.names=F)
-
-write.csv(prot1_met_img_male_fold1, "Data/00_Preprocessing/Met_prot_m/fold1/cohort.csv", row.names=F)
-write.csv(prot1_met_img_male_fold2, "Data/00_Preprocessing/Met_prot_m/fold2/cohort.csv", row.names=F)
+write.csv(met_img_female_test, "Data/00_Preprocessing/Met_f/test_cohort.csv", row.names=F)
+write.csv(met_img_female_train, "Data/00_Preprocessing/Met_f/train_cohort.csv", row.names=F)
+write.csv(met_img_male_test, "Data/00_Preprocessing/Met_m/test_cohort.csv", row.names=F)
+write.csv(met_img_male_train, "Data/00_Preprocessing/Met_m/train_cohort.csv", row.names=F)
