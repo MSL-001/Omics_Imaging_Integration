@@ -3,7 +3,7 @@ library(pheatmap)
 library(dplyr)
 library(tidyr)
 
-generate_heatmap <- function(title, cohort, file, generate_cluster, rows=F,remove_prostate=F){
+generate_heatmap <- function(title, cohort, file, generate_cluster, scale, rows=F,remove_prostate=F){
   data_folder <- "Data/01_Statistics/"
 
   file_path <- paste0(data_folder, cohort, file)
@@ -27,7 +27,7 @@ generate_heatmap <- function(title, cohort, file, generate_cluster, rows=F,remov
   #significant_results <- significant_results %>%
   #  dplyr::filter(BC_feature %in% feature_keep)
 
-  results$Adjusted_corr[!(results$Rows_used > 500 & results$q_value < 0.01)] <- NA
+  results$Adjusted_corr[!(results$Rows_used > 1000 & results$q_value < 0.01)] <- NA
 
   mat_df <- results %>%
     dplyr::select(Omics_Feature, BC_feature, Adjusted_corr) %>%
@@ -36,6 +36,14 @@ generate_heatmap <- function(title, cohort, file, generate_cluster, rows=F,remov
   if (!"cardiac_fat" %in% colnames(mat_df)) {
   mat_df[["cardiac_fat"]] <- NA
   }
+
+  mat_df <- mat_df[, names(mat_df) != "unused", drop = FALSE]
+
+  cols <- colnames(mat_df)
+  cols <- append(cols[cols != "cardiac_fat"],
+                    "cardiac_fat",
+                    after = match("bone_other", cols[cols != "cardiac_fat"]))
+  mat_df <- mat_df[, cols]
 
   if (remove_prostate == T){
     mat_df <- mat_df[, colnames(mat_df) != "prostate"]
@@ -73,44 +81,44 @@ generate_heatmap <- function(title, cohort, file, generate_cluster, rows=F,remov
     fontsize <- 10
   }
 
-  # plot using original matrix, but force clustering order
+  colors <- colorRampPalette(c("blue", "white", "red"))(100)
+  breaks <- seq(scale[1], scale[2], length.out = 101)
+
+  show_row_names <- nrow(mat) <= 300
   pheatmap(mat,
            cluster_rows = F,
            cluster_cols = F,
            na_col = "grey90",
+           breaks = breaks,
+           color = colors,
            fontsize_row= fontsize,
-           main=title)
+           main=title,
+           show_rownames = show_row_names)
 }
 
 rows <- F
-cohort <- "Met_m/fold1/"
-generate_heatmap("Metabolomics Male F1 medianff vibe100", cohort, "corr_adj_medianff_100.csv", generate_cluster = T, rows=rows)
-generate_heatmap("Metabolomics Male F1 medianff vibe100 processed", cohort, "corr_adj_medianff_100_processed.csv", generate_cluster = F, rows=rows)
-generate_heatmap("Metabolomics Male F1 meanff vibe100", cohort, "corr_adj_meanff_100.csv", generate_cluster = F, rows=rows)
-generate_heatmap("Metabolomics Male F1 meanff vibe100 processed", cohort, "corr_adj_meanff_100_processed.csv", generate_cluster = F, rows=rows)
-generate_heatmap("Metabolomics Male F1 medianff vibe80", cohort, "corr_adj_medianff_80.csv", generate_cluster = F, rows=rows)
-generate_heatmap("Metabolomics Male F1 medianff vibe80 processed", cohort, "corr_adj_medianff_80_processed.csv", generate_cluster = F, rows=rows)
-generate_heatmap("Metabolomics Male F1 meanff vibe80", cohort, "corr_adj_meanff_80.csv", generate_cluster = F, rows=rows)
-generate_heatmap("Metabolomics Male F1 meanff vibe80 processed", cohort, "corr_adj_meanff_80_processed.csv", generate_cluster = F, rows=rows)
-generate_heatmap("Metabolomics Male F1 volume vibe100", cohort, "corr_adj_vol_100.csv", generate_cluster = F, rows=rows)
-generate_heatmap("Metabolomics Male F1 volume vibe100 processed", cohort, "corr_adj_vol_100_processed.csv", generate_cluster = F, rows=rows)
-generate_heatmap("Metabolomics Male F1 volume vibe80", cohort, "corr_adj_vol_80.csv", generate_cluster = F, rows=rows)
-generate_heatmap("Metabolomics Male F1 volume vibe80 processed", cohort, "corr_adj_vol_80_processed.csv", generate_cluster = F, rows=rows)
+cohort <- "Met_m/"
+scale <- c(-0.4, 0.4)
+generate_heatmap("Metabolomics Male robust meanff vibe100", cohort, "corr_adj_robustmeanff_100.csv", scale, generate_cluster = T, rows=rows)
+generate_heatmap("Metabolomics Male robust meanff vibe100_processed", cohort, "corr_adj_robustmeanff_100_processed.csv", scale, generate_cluster = F, rows=rows)
+generate_heatmap("Metabolomics Male volume vibe100", cohort, "corr_adj_vol_100.csv", scale, generate_cluster = F, rows=rows)
+generate_heatmap("Metabolomics Male volume vibe100_processed", cohort, "corr_adj_vol_100_processed.csv", scale, generate_cluster = F, rows=rows)
 
-generate_heatmap("Proteomics Male F1 medianff vibe100", "Single_prot_m/fold1/", "corr_adj_medianff_100.csv", generate_cluster = T, rows=rows)
-generate_heatmap("Proteomics Male F1 medianff vibe100 processed", "Single_prot_m/fold1/", "corr_adj_medianff_100_processed.csv", generate_cluster = F, rows=rows)
-generate_heatmap("Proteomics Male F1 meanff vibe100", "Single_prot_m/fold1/", "corr_adj_meanff_100.csv", generate_cluster = F, rows=rows)
-generate_heatmap("Proteomics Male F1 meanff vibe100 processed", "Single_prot_m/fold1/", "corr_adj_meanff_100_processed.csv", generate_cluster = F, rows=rows)
-generate_heatmap("Proteomics Male F1 medianff vibe80", "Single_prot_m/fold1/", "corr_adj_medianff_80.csv", generate_cluster = F, rows=rows)
-generate_heatmap("Proteomics Male F1 medianff vibe80 processed", "Single_prot_m/fold1/", "corr_adj_medianff_80_processed.csv", generate_cluster = F, rows=rows)
-generate_heatmap("Proteomics Male F1 meanff vibe80", "Single_prot_m/fold1/", "corr_adj_meanff_80.csv", generate_cluster = F, rows=rows)
-generate_heatmap("Proteomics Male F1 meanff vibe80 processed", "Single_prot_m/fold1/", "corr_adj_meanff_80_processed.csv", generate_cluster = F, rows=rows)
-generate_heatmap("Proteomics Male F1 volume vibe100", "Single_prot_m/fold1/", "corr_adj_vol_100.csv", generate_cluster = F, rows=rows)
-generate_heatmap("Proteomics Male F1 volume vibe100 processed", "Single_prot_m/fold1/", "corr_adj_vol_100_processed.csv", generate_cluster = F, rows=rows)
-generate_heatmap("Proteomics Male F1 volume vibe80", "Single_prot_m/fold1/", "corr_adj_vol_80.csv", generate_cluster = F, rows=rows)
-generate_heatmap("Proteomics Male F1 volume vibe80 processed", "Single_prot_m/fold1/", "corr_adj_vol_80_processed.csv", generate_cluster = F, rows=rows)
+cohort <- "Met_f/"
+generate_heatmap("Metabolomics Female robust meanff vibe100", cohort, "corr_adj_robustmeanff_100.csv", scale, generate_cluster = T, rows=rows)
+generate_heatmap("Metabolomics Female robust meanff vibe100_processed", cohort, "corr_adj_robustmeanff_100_processed.csv", scale, generate_cluster = F, rows=rows)
+generate_heatmap("Metabolomics Female volume vibe100", cohort, "corr_adj_vol_100.csv", scale, generate_cluster = F, rows=rows)
+generate_heatmap("Metabolomics Female volume vibe100_processed", cohort, "corr_adj_vol_100_processed.csv", scale, generate_cluster = F, rows=rows)
 
-generate_heatmap("Metabolomics Male F1 medianff vibe100 processed", cohort,
-                 "corr_adj_medianff_100_processed.csv", generate_cluster = T, rows=rows, remove_prostate = T)
-cohort <- "Met_f/fold1/"
-generate_heatmap("Metabolomics Female F1 medianff vibe100 processed", cohort, "corr_adj_medianff_100_processed.csv", generate_cluster = F, rows=rows)
+scale <- c(-0.4, 0.4)
+cohort <- "Single_prot_m/"
+generate_heatmap("Proteomics Male robust meanff vibe100", cohort, "corr_adj_robustmeanff_100.csv", scale, generate_cluster = T, rows=rows)
+generate_heatmap("Proteomics Male robust meanff vibe100_processed", cohort, "corr_adj_robustmeanff_100_processed.csv", scale, generate_cluster = F, rows=rows)
+generate_heatmap("Proteomics Male volume vibe100", cohort, "corr_adj_vol_100.csv", scale, generate_cluster = F, rows=rows)
+generate_heatmap("Proteomics Male volume vibe100_processed", cohort, "corr_adj_vol_100_processed.csv", scale, generate_cluster = F, rows=rows)
+
+cohort <- "Single_prot_f/"
+generate_heatmap("Proteomics Female robust meanff vibe100", cohort, "corr_adj_robustmeanff_100.csv", scale, generate_cluster = T, rows=rows)
+generate_heatmap("Proteomics Female robust meanff vibe100_processed", cohort, "corr_adj_robustmeanff_100_processed.csv", scale, generate_cluster = F, rows=rows)
+generate_heatmap("Proteomics Female volume vibe100", cohort, "corr_adj_vol_100.csv", scale, generate_cluster = F, rows=rows)
+generate_heatmap("Proteomics Female volume vibe100_processed", cohort, "corr_adj_vol_100_processed.csv", scale, generate_cluster = F, rows=rows)
