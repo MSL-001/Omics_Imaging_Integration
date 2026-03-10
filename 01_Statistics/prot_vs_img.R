@@ -8,10 +8,14 @@ library(mixOmics) # import the mixOmics library
 img_type_string <- "test"
 interested_feature <- "meanff_1"
 p_threshold <- 0.05
+train_eids_path <- "train_cohort.csv"
+test_eids_path <- "test_cohort.csv"
+correction_formula <- ~ age_0 + age_between
+
 
 args <- commandArgs(trailingOnly = TRUE)
 
-input_metabolomics_path <- args[1]
+input_proteomics_path <- args[1]
 input_image_path <- args[2]
 train_eids_path <- args[3]
 test_eids_path <- args[4]
@@ -20,7 +24,7 @@ interested_feature <- args[6]
 
 train_eids  <- read.csv(train_eids_path)
 test_eids  <- read.csv(test_eids_path)
-metabolomics_data <- read.csv(input_metabolomics_path)
+proteomics_data <- read.csv(input_proteomics_path)
 image_data <- read.csv(input_image_path)
 age_data <- read.csv("age_data.csv")
 # height_data <- read.csv("height_data.csv")
@@ -29,10 +33,10 @@ NA_threshold <- 0.3
 
 colnames(image_data)[colnames(image_data) == "subject_ID"] <- "eid"
 
-metabolomics_train <- metabolomics_data %>%
+proteomics_train <- proteomics_data %>%
   filter(eid %in% train_eids$eid)
 
-metabolomics_test <- metabolomics_data %>%
+proteomics_test <- proteomics_data %>%
   filter(eid %in% test_eids$eid)
 
 image_data_train <- image_data %>%
@@ -64,45 +68,68 @@ apply_normalizer <- function(df, norm){
   return(df)
 }
 
-run_modeling <- function (met, img){
-  met <- met[, colMeans(is.na(met)) <= NA_threshold]
-  met <- met[rowMeans(is.na(met)) <= NA_threshold,]
+run_modeling <- function (prot, img){
+  prot <- prot[, colMeans(is.na(prot)) <= NA_threshold]
+  prot <- prot[rowMeans(is.na(prot)) <= NA_threshold,]
 
   img <- img[,colMeans(is.na(img)) <= NA_threshold]
   img <- img[rowMeans(is.na(img)) <= NA_threshold,]
 
-  met_eids <- met$eid
+  prot_eids <- prot$eid
   img_eids <- img$eid
-  keep_eids <- intersect(met_eids, img_eids)
+  keep_eids <- intersect(prot_eids, img_eids)
 
-  met <- met[met$eid %in% keep_eids, ]
+  prot <- prot[prot$eid %in% keep_eids, ]
 
   img <- img[img$eid %in% keep_eids, ]
 
-  norm_met <- fit_normalizer(met, "eid")
-  met <- apply_normalizer(met, norm_met)
+  norm_prot <- fit_normalizer(prot, "eid")
+  prot <- apply_normalizer(prot, norm_prot)
 
   norm_img <- fit_normalizer(img, "eid")
   img <- apply_normalizer(img, norm_img)
 
-  met <- na.omit(met)
+  prot[is.na(prot)] <- 0
   img <- na.omit(img)
 
-  met_eids <- met$eid
+  prot_eids <- prot$eid
   img_eids <- img$eid
-  keep_eids <- intersect(met_eids, img_eids)
+  keep_eids <- intersect(prot_eids, img_eids)
 
-  met <- met[met$eid %in% keep_eids, ]
+  prot <- prot[prot$eid %in% keep_eids, ]
 
   img <- img[img$eid %in% keep_eids, ]
 
-  X <<- met[, setdiff(names(met), "eid")]
-  row.names(X) <<- met[["eid"]]
+  residualize_vector <- function(v, covar_data, correction_formula) {
+    df <- covar_data
+    df$target <- v
+    fit <- lm(update(correction_formula, target ~ .), data = df)
+    residuals(fit)
+  }
 
-  y <- img[[interested_feature]]
+  y <- img[, interested_feature, drop = FALSE]
+
+  age_img_aligned <- age_data[match(img$eid, age_data$eid), ]
+
+  y[[interested_feature]] <- residualize_vector(
+    y[[interested_feature]],
+    age_img_aligned,
+    correction_formula
+  )
+
+  y <- y[[interested_feature]]
+
+  age_prot_aligned <- age_data[match(prot$eid, age_data$eid), ]
+
+  X <- prot[, setdiff(names(prot), "eid"), drop = FALSE]
+  row.names(X) <- prot$eid
+
+  X <- as.data.frame(lapply(X, function(v) {
+    residualize_vector(v, age_prot_aligned, correction_formula)
+  }))
 
   univar_stats <- data.frame(
-    metabolite = colnames(X),
+    protein = colnames(X),
     cor = NA_real_,
     pvalue = NA_real_
   )
@@ -113,13 +140,13 @@ run_modeling <- function (met, img){
     univar_stats$pvalue[j] <- test$p.value
   }
 
-  keep_metabolites <- univar_stats$metabolite[univar_stats$pvalue < p_threshold]
+  keep_proteins <- univar_stats$protein[univar_stats$pvalue < p_threshold]
 
-  X <- X[, keep_metabolites, drop = FALSE]
+  X <- X[, keep_proteins, drop = FALSE]
 
-  print(paste("Number of metabolites selected:", ncol(X)))
+  print(paste("Number of proteins selected:", ncol(X)))
 
-  pls.result <<- pls(X, y, ncomp= 10, mode = 'regression')
+  pls.result <- pls(X, y, ncomp= 10, mode = 'regression')
 
   png(filename=paste0("Ind_", img_type_string, ".png"))
   plotIndiv(pls.result, ind.names = FALSE)
@@ -140,40 +167,39 @@ run_modeling <- function (met, img){
   png(filename=paste0("R2_", img_type_string, ".png"))
   p <- plot(Q2.pls.result, criterion = "R2")
   print(p)
-
   dev.off()
 }
 
-run_test <- function(met_test, met_train, img_test, img_train, n_comp){
-  met_train <- met_train[, colMeans(is.na(met_train)) <= NA_threshold]
-  met_train <- met_train[rowMeans(is.na(met_train)) <= NA_threshold,]
+run_test <- function(prot_test, prot_train, img_test, img_train, n_comp){
+  prot_train <- prot_train[, colMeans(is.na(prot_train)) <= NA_threshold]
+  prot_train <- prot_train[rowMeans(is.na(prot_train)) <= NA_threshold,]
 
   img_train <- img_train[,colMeans(is.na(img_train)) <= NA_threshold]
   img_train <- img_train[rowMeans(is.na(img_train)) <= NA_threshold,]
 
-  norm_met <- fit_normalizer(met_train, "eid")
-  met_train <- apply_normalizer(met_train, norm_met)
-  met_test <- apply_normalizer(met_test, norm_met)
+  norm_prot <- fit_normalizer(prot_train, "eid")
+  prot_train <- apply_normalizer(prot_train, norm_prot)
+  prot_test <- apply_normalizer(prot_test, norm_prot)
 
   norm_img <- fit_normalizer(img_train, "eid")
   img_train <- apply_normalizer(img_train, norm_img)
   img_test <- apply_normalizer(img_test, norm_img)
 
 
-  met_train[is.na(met_train)] <- 0
-  met_test[is.na(met_test)] <- 0
+  prot_train[is.na(prot_train)] <- 0
+  prot_test[is.na(prot_test)] <- 0
   img_train <- na.omit(img_train)
   img_test <- na.omit(img_test)
 
-  met_ids <- met$eid
+  prot_eids <- prot$eid
   img_eids <- img$eid
-  keep_eids <- intersect(met_ids, img_eids)
+  keep_eids <- intersect(prot_eids, img_eids)
 
-  met <- met[met$eid %in% keep_eids, ]
+  prot <- prot[prot$eid %in% keep_eids, ]
 
   img <- img[img$eid %in% keep_eids, ]
 
 
 }
 
-run_modeling(metabolomics_train, image_data_train)
+run_modeling(proteomics_train, image_data_train)
