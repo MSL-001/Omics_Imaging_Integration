@@ -8,6 +8,7 @@ library(mixOmics) # import the mixOmics library
 img_type_string <- "test"
 interested_feature <- "meanff_1"
 p_threshold <- 0.05
+correction_formula <- ~ age_0 + age_between
 
 args <- commandArgs(trailingOnly = TRUE)
 
@@ -96,10 +97,34 @@ run_modeling <- function (met, img){
 
   img <- img[img$eid %in% keep_eids, ]
 
-  X <<- met[, setdiff(names(met), "eid")]
-  row.names(X) <<- met[["eid"]]
 
-  y <- img[[interested_feature]]
+  residualize_vector <- function(v, covar_data, correction_formula) {
+    df <- covar_data
+    df$target <- v
+    fit <- lm(update(correction_formula, target ~ .), data = df)
+    residuals(fit)
+  }
+
+  y <- img[, interested_feature, drop = FALSE]
+
+  age_img_aligned <- age_data[match(img$eid, age_data$eid), ]
+
+  y[[interested_feature]] <- residualize_vector(
+    y[[interested_feature]],
+    age_img_aligned,
+    correction_formula
+  )
+
+  y <- y[[interested_feature]]
+
+  age_met_aligned <- age_data[match(met$eid, age_data$eid), ]
+
+  X <- met[, setdiff(names(met), "eid"), drop = FALSE]
+  row.names(X) <- met$eid
+
+  X <- as.data.frame(lapply(X, function(v) {
+    residualize_vector(v, age_met_aligned, correction_formula)
+  }))
 
   univar_stats <- data.frame(
     metabolite = colnames(X),
