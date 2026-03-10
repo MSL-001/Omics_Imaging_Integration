@@ -65,6 +65,17 @@ apply_normalizer <- function(df, norm){
   return(df)
 }
 
+residualize_vector <- function(v, covar_data, correction_formula) {
+  df <- covar_data
+  df$target <- v
+
+  fit <- lm(update(correction_formula, target ~ .),
+            data = df,
+            na.action = na.exclude)
+
+  residuals(fit)
+}
+
 run_modeling <- function (met, img){
   met <- met[, colMeans(is.na(met)) <= NA_threshold]
   met <- met[rowMeans(is.na(met)) <= NA_threshold,]
@@ -74,11 +85,44 @@ run_modeling <- function (met, img){
 
   met_eids <- met$eid
   img_eids <- img$eid
+  age_data <- na.omit(age_data)
+  age_eids <- age_data$eid
   keep_eids <- intersect(met_eids, img_eids)
+  keep_eids <- intersect(keep_eids, age_eids)
+
 
   met <- met[met$eid %in% keep_eids, ]
 
   img <- img[img$eid %in% keep_eids, ]
+
+  age_data <- age_data[age_data$eid %in% keep_eids, ]
+
+
+  met_eids <- met$eid
+
+  age_met_aligned <- age_data[match(met$eid, age_data$eid), ]
+
+  met <- met[, setdiff(names(met), "eid"), drop = FALSE]
+
+  met <- as.data.frame(lapply(met, function(v) {
+    residualize_vector(v, age_met_aligned, correction_formula)
+  }))
+
+  met$eid <- met_eids
+
+  img_eids <- img$eid
+
+  img <- img[, interested_feature, drop = FALSE]
+
+  age_img_aligned <- age_data[match(img_eids, age_data$eid), ]
+
+  img[[interested_feature]] <- residualize_vector(
+    img[[interested_feature]],
+    age_img_aligned,
+    correction_formula
+  )
+
+  img[["eid"]] <- img_eids
 
   norm_met <- fit_normalizer(met, "eid")
   met <- apply_normalizer(met, norm_met)
@@ -86,46 +130,9 @@ run_modeling <- function (met, img){
   norm_img <- fit_normalizer(img, "eid")
   img <- apply_normalizer(img, norm_img)
 
-  met <- na.omit(met)
-  img <- na.omit(img)
-
-  met_eids <- met$eid
-  img_eids <- img$eid
-  keep_eids <- intersect(met_eids, img_eids)
-
-  met <- met[met$eid %in% keep_eids, ]
-
-  img <- img[img$eid %in% keep_eids, ]
-
-
-  residualize_vector <- function(v, covar_data, correction_formula) {
-    df <- covar_data
-    df$target <- v
-    fit <- lm(update(correction_formula, target ~ .), data = df)
-    residuals(fit)
-  }
-
-  y <- img[, interested_feature, drop = FALSE]
-
-  age_img_aligned <- age_data[match(img$eid, age_data$eid), ]
-
-  y[[interested_feature]] <- residualize_vector(
-    y[[interested_feature]],
-    age_img_aligned,
-    correction_formula
-  )
-
-  y <- y[[interested_feature]]
-
-  age_met_aligned <- age_data[match(met$eid, age_data$eid), ]
-
   X <- met[, setdiff(names(met), "eid"), drop = FALSE]
-  row.names(X) <- met$eid
-
-  X <- as.data.frame(lapply(X, function(v) {
-    residualize_vector(v, age_met_aligned, correction_formula)
-  }))
-
+  y <- img[[interested_feature]]
+  
   univar_stats <- data.frame(
     metabolite = colnames(X),
     cor = NA_real_,
@@ -137,6 +144,27 @@ run_modeling <- function (met, img){
     univar_stats$cor[j] <- unname(test$estimate)
     univar_stats$pvalue[j] <- test$p.value
   }
+
+  met <- na.omit(met)
+  img <- na.omit(img)
+  age_data <- na.omit(age_data)
+
+  met_eids <- met$eid
+  img_eids <- img$eid
+  age_eids <- age_data$eid
+  keep_eids <- intersect(met_eids, img_eids)
+  keep_eids <- intersect(keep_eids, age_eids)
+
+  met <- met[met$eid %in% keep_eids, ]
+
+  img <- img[img$eid %in% keep_eids, ]
+
+  X <- met[, setdiff(names(met), "eid"), drop = FALSE]
+  row.names(X) <- met$eid
+
+  y <- img[[interested_feature]]
+
+
 
   keep_metabolites <- univar_stats$metabolite[univar_stats$pvalue < p_threshold]
 
