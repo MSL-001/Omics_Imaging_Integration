@@ -69,12 +69,14 @@ age_data <- data.frame(
 
 height_data <- data.frame(
   eid = proteomics_data$eid,
-  height = sample(140:200, n_samples, replace = TRUE)
+  p50_i0 = sample(140:200, n_samples, replace = TRUE)
 )
 
 
 image_data$meanff_1 <- image_data$meanff_1 +
                         proteomics_data$prot_3 * 500 - proteomics_data$prot_1 *200 + proteomics_data$prot_5*100 + age_data$age_0 *1000
+
+mage_data$meanff_1 <- proteomics_data$prot_3 * 500 - proteomics_data$prot_1 *200 + proteomics_data$prot_5*100
 
 
 
