@@ -18,17 +18,32 @@ train_eids_path <- args[3]
 test_eids_path <- args[4]
 img_type_string <- args[5]
 interested_feature <- args[6]
+height_included <- args[7]
+
+if (height_included == TRUE){
+  correction_formula <- ~ age_0 + age_between + p50_i0
+}
 
 train_eids  <- read.csv(train_eids_path)
 test_eids  <- read.csv(test_eids_path)
 metabolomics_data <- read.csv(input_metabolomics_path)
 image_data <- read.csv(input_image_path)
 age_data <- read.csv("age_data.csv")
-# height_data <- read.csv("height_data.csv")
+height_data <- read.csv("height_data.csv")
+encoding <- read.csv("encoding.csv")
+
 
 NA_threshold <- 0.3
 
 colnames(image_data)[colnames(image_data) == "subject_ID"] <- "eid"
+
+lookup <- setNames(encoding$Name, encoding$Code)
+
+colnames(metabolomics_data) <- ifelse(
+  colnames(metabolomics_data) %in% names(lookup),
+  lookup[colnames(metabolomics_data)],
+  colnames(metabolomics_data)
+)
 
 metabolomics_train <- metabolomics_data %>%
   filter(eid %in% train_eids$eid)
@@ -83,29 +98,25 @@ run_modeling <- function (met, img){
   img <- img[,colMeans(is.na(img)) <= NA_threshold]
   img <- img[rowMeans(is.na(img)) <= NA_threshold,]
 
-  met_eids <- met$eid
-  img_eids <- img$eid
   age_data <- na.omit(age_data)
-  age_eids <- age_data$eid
-  keep_eids <- intersect(met_eids, img_eids)
-  keep_eids <- intersect(keep_eids, age_eids)
+  height_data <- na.omit(height_data)
+  meta_data <- merge(age_data, height_data, by="eid")
 
+  keep_eids <- Reduce(intersect, list(met$eid, img$eid, meta_data$eid))
 
-  met <- met[met$eid %in% keep_eids, ]
-
-  img <- img[img$eid %in% keep_eids, ]
-
-  age_data <- age_data[age_data$eid %in% keep_eids, ]
+  met <- met[match(keep_eids, met$eid), ]
+  img <- img[match(keep_eids, img$eid), ]
+  meta_data <- meta_data[match(keep_eids, meta_data$eid), ]
 
 
   met_eids <- met$eid
 
-  age_met_aligned <- age_data[match(met$eid, age_data$eid), ]
+  meta_met_aligned <- meta_data[match(met$eid, meta_data$eid), ]
 
   met <- met[, setdiff(names(met), "eid"), drop = FALSE]
 
   met <- as.data.frame(lapply(met, function(v) {
-    residualize_vector(v, age_met_aligned, correction_formula)
+    residualize_vector(v, meta_met_aligned, correction_formula)
   }))
 
   met$eid <- met_eids
@@ -114,11 +125,11 @@ run_modeling <- function (met, img){
 
   img <- img[, interested_feature, drop = FALSE]
 
-  age_img_aligned <- age_data[match(img_eids, age_data$eid), ]
+  meta_img_aligned <- meta_data[match(img_eids, meta_data$eid), ]
 
   img[[interested_feature]] <- residualize_vector(
     img[[interested_feature]],
-    age_img_aligned,
+    meta_img_aligned,
     correction_formula
   )
 
@@ -132,7 +143,7 @@ run_modeling <- function (met, img){
 
   X <- met[, setdiff(names(met), "eid"), drop = FALSE]
   y <- img[[interested_feature]]
-  
+
   univar_stats <- data.frame(
     metabolite = colnames(X),
     cor = NA_real_,
@@ -140,31 +151,27 @@ run_modeling <- function (met, img){
   )
 
   for (j in seq_along(X)) {
-    test <- suppressWarnings(cor.test(X[[j]], y, method = "pearson"))
+    test_X <- X[[j]]
+    test_y <- y
+    ok <- complete.cases(test_X, test_y)
+
+    test <- suppressWarnings(cor.test(test_X[ok], test_y[ok], method = "pearson"))
     univar_stats$cor[j] <- unname(test$estimate)
     univar_stats$pvalue[j] <- test$p.value
   }
 
-  met <- na.omit(met)
+  met[is.na(met)] <- 0
   img <- na.omit(img)
-  age_data <- na.omit(age_data)
 
-  met_eids <- met$eid
-  img_eids <- img$eid
-  age_eids <- age_data$eid
-  keep_eids <- intersect(met_eids, img_eids)
-  keep_eids <- intersect(keep_eids, age_eids)
+  keep_eids <- Reduce(intersect, list(met$eid, img$eid, meta_data$eid))
 
-  met <- met[met$eid %in% keep_eids, ]
-
-  img <- img[img$eid %in% keep_eids, ]
+  met <- met[match(keep_eids, met$eid), ]
+  img <- img[match(keep_eids, img$eid), ]
 
   X <- met[, setdiff(names(met), "eid"), drop = FALSE]
   row.names(X) <- met$eid
 
   y <- img[[interested_feature]]
-
-
 
   keep_metabolites <- univar_stats$metabolite[univar_stats$pvalue < p_threshold]
 
@@ -172,28 +179,40 @@ run_modeling <- function (met, img){
 
   print(paste("Number of metabolites selected:", ncol(X)))
 
-  pls.result <<- pls(X, y, ncomp= 10, mode = 'regression')
+  pls.result <- pls(X, y, ncomp= 10, mode = 'regression')
 
-  png(filename=paste0("Ind_", img_type_string, ".png"))
+  saveRDS(pls.result, paste0(interested_feature, "_results.Rda"))
+
+  png(filename=paste0(interested_feature, "_sample_spread.png"))
   plotIndiv(pls.result, ind.names = FALSE)
   dev.off()
 
-  png(filename=paste0("Var_", img_type_string, ".png"))
+  png(filename=paste0(interested_feature, "_Variance.png"))
   plotVar(pls.result, var.names = FALSE)
+  dev.off()
+
+  png(filename=paste0(interested_feature, "_Loadings.png"))
+  plotLoadings(pls.result, comp = 1, contrib = 'max', method = 'median', block = "X", title="Top 10 Metabolites",ndisplay =10)
   dev.off()
 
   Q2.pls.result <- perf(pls.result, validation = 'Mfold',
                 folds = 10, nrepeat = 5)
 
-  png(filename=paste0("Q2_", img_type_string, ".png"))
-  p <- plot(Q2.pls.result, criterion = "Q2")
+  saveRDS(Q2.pls.result, paste0(interested_feature, "_R2_results.Rda"))
+
+  png(filename=paste0(interested_feature, "_R2_train.png"))
+  vals <- Q2.pls.result$measures$R2$summary$mean
+  p <- plot(Q2.pls.result, criterion = "R2", ylim=c(1,-1),title=paste0("R2 of comp 1 is ", round(Q2.pls.result$measures$R2$summary$mean[[1]], 4)))
+  p <- p + coord_cartesian(ylim = c(min(min(vals[vals > -1], 0)), max(Q2.pls.result$measures$R2$summary$mean)))
   print(p)
   dev.off()
 
-  png(filename=paste0("R2_", img_type_string, ".png"))
-  p <- plot(Q2.pls.result, criterion = "R2")
+  png(filename=paste0(interested_feature, "_R2_heldout.png"))
+  Q2.pls.result$measures$R2 <- Q2.pls.result$measures$Q2
+  vals <- Q2.pls.result$measures$R2$summary$mean
+  p <- plot(Q2.pls.result, criterion = "R2", ylim=c(1,-1),title=paste0("R2 of comp 1 is ", round(Q2.pls.result$measures$R2$summary$mean[[1]], 4)))
+  p <- p + coord_cartesian(ylim = c(min(min(vals[vals > -1], 0)), max(Q2.pls.result$measures$R2$summary$mean)))
   print(p)
-
   dev.off()
 }
 
