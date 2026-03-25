@@ -181,7 +181,7 @@ run_modeling <- function (met, img){
 
   pls.result <- pls(X, y, ncomp= 10, mode = 'regression')
 
-  saveRDS(pls.result, paste0(interested_feature, "_results.Rda"))
+  saveRDS(pls.result, paste0(interested_feature, "_results.rds"))
 
   png(filename=paste0(interested_feature, "_sample_spread.png"))
   plotIndiv(pls.result, ind.names = FALSE)
@@ -198,7 +198,7 @@ run_modeling <- function (met, img){
   Q2.pls.result <- perf(pls.result, validation = 'Mfold',
                 folds = 10, nrepeat = 5)
 
-  saveRDS(Q2.pls.result, paste0(interested_feature, "_R2_results.Rda"))
+  saveRDS(Q2.pls.result, paste0(interested_feature, "_R2_results.rds"))
 
   png(filename=paste0(interested_feature, "_R2_train.png"))
   vals <- Q2.pls.result$measures$R2$summary$mean
