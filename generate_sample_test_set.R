@@ -22,6 +22,28 @@ mask <- matrix(
 
 proteomics_data[-1][mask] <- NA
 
+# Generate Metabolomics data
+n_samples  <- 10000
+n_metabolites <- 200
+
+metabolomics_data <- data.frame(
+  eid = 1001:(n_samples+1000)
+)
+
+metabolomics_data[paste0("met_", 1:n_metabolites)] <-
+  matrix(rnorm(n_samples * n_metabolites, mean = 0, sd = 1),
+         nrow = n_samples)
+
+
+# missing_rate <- 0.1
+#
+# mask <- matrix(
+#   runif(n_samples * n_metabolites) < missing_rate,
+#   nrow = n_samples
+# )
+#
+# metabolomics_data[-1][mask] <- NA
+
 # Generate image data
 n_samples <- nrow(proteomics_data)
 n_features <- 20
@@ -76,7 +98,8 @@ height_data <- data.frame(
 image_data$meanff_1 <- image_data$meanff_1 +
                         proteomics_data$prot_3 * 500 - proteomics_data$prot_1 *200 + proteomics_data$prot_5*100 + age_data$age_0 *1000
 
-mage_data$meanff_1 <- proteomics_data$prot_3 * 500 - proteomics_data$prot_1 *200 + proteomics_data$prot_5*100
+image_data$meanff_1 <- proteomics_data$prot_3 * 500 - proteomics_data$prot_1 *200 + proteomics_data$prot_5*100 + metabolomics_data$met_1*500
+# image_data$meanff_1 <- proteomics_data$prot_3 * 500 - proteomics_data$prot_1 *200 + proteomics_data$prot_5*100
 
 
 
