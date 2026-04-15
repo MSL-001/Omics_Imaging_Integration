@@ -59,14 +59,22 @@ height_data <- read.csv("height_data.csv")
 
 encoding <- read.csv(encoding_path)
 
+colnames(image_data)[colnames(image_data) == "subject_ID"] <- "eid"
+
+lookup <- setNames(encoding$Name, encoding$Code)
+
+colnames(metabolomics_data) <- ifelse(
+  colnames(metabolomics_data) %in% names(lookup),
+  lookup[colnames(metabolomics_data)],
+  colnames(metabolomics_data)
+)
+
 met_resid_models <- readRDS(paste0(interested_feature, "_metabolite_residualizers.rds"))
 img_train_fit <- readRDS(paste0(interested_feature, "_image_residualizer.rds"))
 norm_met <- readRDS(paste0(interested_feature, "_metabolite_normalizers.rds"))
 norm_img <- readRDS(paste0(interested_feature, "_image_normalizer.rds"))
 
 model <- readRDS(paste0(interested_feature, "_results.rds"))
-
-colnames(image_data)[colnames(image_data) == "subject_ID"] <- "eid"
 
 met_test <- metabolomics_data %>%
   filter(eid %in% test_eids$eid)
@@ -146,6 +154,8 @@ pred <- predict(model, newdata=X)
 
 y_est <- pred$predict[,,ncomp]
 
+rmse <- sqrt(mean((y_true - y_est)^2))
+
 ss_res <- sum((y_true - y_est)^2)
 ss_tot <- sum((y_true - mean(y_true))^2)
 
@@ -153,7 +163,10 @@ r2_test <- if (ss_tot == 0) NA_real_ else 1 - ss_res / ss_tot
 
 print(r2_test)
 
-writeLines(
-  paste0("R2_test: ", r2_test),
+writeLines(c(
+           paste0("R2_test at ", ncomp," components: ", r2_test),
+           paste0("RMSE at ", ncomp," components: ", rmse)
+)
+  ,
   con = paste0(interested_feature, "_r2_test.txt")
 )
