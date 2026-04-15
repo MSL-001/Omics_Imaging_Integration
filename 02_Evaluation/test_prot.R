@@ -77,6 +77,9 @@ age_data <- na.omit(age_data)
 height_data <- na.omit(height_data)
 meta_data <- merge(age_data, height_data, by="eid")
 
+meta_data <- meta_data %>%
+  filter(eid %in% test_eids$eid)
+
 keep_eids <- Reduce(intersect, list(prot_test$eid, img_test$eid, meta_data$eid))
 
 prot_test <- prot_test[match(keep_eids, prot_test$eid), ]
