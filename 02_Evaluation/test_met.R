@@ -7,7 +7,6 @@ library(mixOmics) # import the mixOmics library
 
 apply_residualizer <- function(v, covar_data, fitted_obj) {
   df <- covar_data
-  df$target <- v
 
   pred <- predict(fitted_obj$fit, newdata = df)
   v - pred
@@ -25,28 +24,102 @@ apply_normalizer <- function(df, norm){
   return(df)
 }
 
-img_type_string <- "test"
-interested_feature <- "meanff_1"
-p_threshold <- 0.05
-train_eids_path <- "train_cohort.csv"
-test_eids_path <- "test_cohort.csv"
-correction_formula <- ~ age_0 + age_between
-encoding_path <- "Data/Metadata/encoding.csv"
-ncomp <- 2
-
 args <- commandArgs(trailingOnly = TRUE)
 
 input_metabolomics_path <- args[1]
 input_image_path <- args[2]
 train_eids_path <- args[3]
 test_eids_path <- args[4]
-img_type_string <- args[5]
-interested_feature <- args[6]
-height_included <- args[7]
-ncomp <- as.integer(args[8])
+feature_type <- args[5]
+cohort <- args[6]
+gender <- args[7]
 
-if (height_included == TRUE){
-  correction_formula <- ~ age_0 + age_between + p50_i0
+features <- c("adrenal_gland_left",
+"adrenal_gland_right",
+"cardiac_fat",
+"duodenum",
+"esophagus",
+"gallbladder",
+"heart",
+"inner_fat",
+"intestine",
+"kidney_left",
+"kidney_right",
+"liver",
+"pancreas",
+"sacrum",
+"spleen",
+"stomach",
+"subcutaneous_fat",
+"thyroid_gland",
+"trachea",
+"urinary_bladder",
+"lung_upper_lobe_left",
+"lung_lower_lobe_left",
+"lung_upper_lobe_right",
+"lung_middle_lobe_right",
+"lung_lower_lobe_right",
+"prostate",
+"aorta",
+"pulmonary_vein",
+"brachiocephalic_trunk",
+"subclavian_artery_right",
+"subclavian_artery_left",
+"common_carotid_artery_right",
+"common_carotid_artery_left",
+"brachiocephalic_vein_left",
+"brachiocephalic_vein_right",
+"atrial_appendage_left",
+"superior_vena_cava",
+"inferior_vena_cava",
+"portal_vein_and_splenic_vein",
+"iliac_artery_left",
+"iliac_artery_right",
+"iliac_vena_left",
+"iliac_vena_right",
+"humerus_left",
+"humerus_right",
+"scapula_left",
+"scapula_right",
+"clavicula_left",
+"clavicula_right",
+"femur_left",
+"femur_right",
+"hip_left",
+"hip_right",
+"spinal_cord",
+"gluteus_maximus_left",
+"gluteus_maximus_right",
+"gluteus_medius_left",
+"gluteus_medius_right",
+"gluteus_minimus_left",
+"gluteus_minimus_right",
+"autochthon_left",
+"autochthon_right",
+"iliopsoas_left",
+"iliopsoas_right",
+"sternum",
+"costal_cartilages",
+"muscle",
+"IVD",
+"vertebra_body",
+"vertebra_posterior_elements",
+"spinal_channel",
+"bone_other",
+"gluteus_maximus_left_fat",
+"gluteus_maximus_right_fat",
+"gluteus_medius_left_fat",
+"gluteus_medius_right_fat",
+"gluteus_minimus_left_fat",
+"gluteus_minimus_right_fat",
+"autochthon_left_fat",
+"autochthon_right_fat",
+"iliopsoas_left_fat",
+"iliopsoas_right_fat",
+"muscle_fat")
+
+if (gender == "female"){
+  features <- setdiff(features, "prostate")
 }
 
 train_eids  <- read.csv(train_eids_path)
@@ -61,22 +134,7 @@ encoding <- read.csv(encoding_path)
 
 colnames(image_data)[colnames(image_data) == "subject_ID"] <- "eid"
 
-lookup <- setNames(encoding$Name, encoding$Code)
-
-colnames(metabolomics_data) <- ifelse(
-  colnames(metabolomics_data) %in% names(lookup),
-  lookup[colnames(metabolomics_data)],
-  colnames(metabolomics_data)
-)
-
-met_resid_models <- readRDS(paste0(interested_feature, "_metabolite_residualizers.rds"))
-img_train_fit <- readRDS(paste0(interested_feature, "_image_residualizer.rds"))
-norm_met <- readRDS(paste0(interested_feature, "_metabolite_normalizers.rds"))
-norm_img <- readRDS(paste0(interested_feature, "_image_normalizer.rds"))
-
-model <- readRDS(paste0(interested_feature, "_results.rds"))
-
-met_test <- metabolomics_data %>%
+omic_test <- metabolomics_data %>%
   filter(eid %in% test_eids$eid)
 
 img_test <- image_data %>%
@@ -86,87 +144,127 @@ age_data <- na.omit(age_data)
 height_data <- na.omit(height_data)
 meta_data <- merge(age_data, height_data, by="eid")
 
-keep_eids <- Reduce(intersect, list(met_test$eid, img_test$eid, meta_data$eid))
+meta_data <- meta_data %>%
+  filter(eid %in% test_eids$eid)
 
-met_test <- met_test[match(keep_eids, met_test$eid), ]
-img_test <- img_test[match(keep_eids, img_test$eid), ]
-meta_data <- meta_data[match(keep_eids, meta_data$eid), ]
+keep_eids <- Reduce(intersect, list(omic_test$eid, img_test$eid, meta_data$eid))
 
-met_eids <- met_test$eid
-meta_met_aligned <- meta_data[match(met_eids, meta_data$eid), ]
+omic_test_global <- omic_test[match(keep_eids, omic_test$eid), ]
+img_test_global <- img_test[match(keep_eids, img_test$eid), ]
+meta_data_global <- meta_data[match(keep_eids, meta_data$eid), ]
 
-available_metabolites <- intersect(colnames(met_test), names(met_resid_models))
-missing_metabolites <- setdiff(colnames(met_test), available_metabolites)
 
-if (length(missing_metabolites) > 0) {
-  message("Missing residualizer models for: ", paste(missing_metabolites, collapse = ", "))
-}
+results <- data.frame(
+   feature = features,
+   r2_comp1 = NA,
+   r2_comp2 = NA,
+   r2_comp3 = NA,
+   r2_comp4 = NA,
+   r2_comp5 = NA,
+   r2_comp6 = NA,
+   r2_comp7 = NA,
+   r2_comp8 = NA,
+   r2_comp9 = NA,
+   r2_comp10 = NA,
+   RMSE_comp1 =NA,
+   RMSE_comp2 =NA,
+   RMSE_comp3 =NA,
+   RMSE_comp4 =NA,
+   RMSE_comp5 =NA,
+   RMSE_comp6 =NA,
+   RMSE_comp7 =NA,
+   RMSE_comp8 =NA,
+   RMSE_comp9 =NA,
+   RMSE_comp10 =NA
+)
 
-met_test_mat <- met_test[, available_metabolites, drop = FALSE]
-met_test_resid <- met_test_mat
+for (feature in features){
+  omic_test <- omic_test_global
+  img_test <- img_test_global
+  meta_data <- meta_data_global
 
-for (j in seq_along(met_test_mat)) {
-  met_test_resid[[j]] <- apply_residualizer(
-    v = met_test_mat[[j]],
-    covar_data = meta_met_aligned,
-    fitted_obj = met_resid_models[[colnames(met_test_mat)[j]]]
+  omic_resid_models <- readRDS(paste0("/mnt/project/Data/", cohort,"/",feature_type,"/",feature,"/",feature, "_metabolite_residualizers.rds"))
+  img_train_fit <- readRDS(paste0("/mnt/project/Data/", cohort,"/",feature_type,"/",feature,"/",feature, "_image_residualizer.rds"))
+  norm_omic <- readRDS(paste0("/mnt/project/Data/", cohort,"/",feature_type,"/",feature,"/",feature, "_metabolite_normalizers.rds"))
+  norm_img <- readRDS(paste0("/mnt/project/Data/", cohort,"/",feature_type,"/",feature,"/",feature, "_image_normalizer.rds"))
+
+  model <- readRDS(paste0("/mnt/project/Data/", cohort,"/",feature_type,"/",feature,"/",feature, "_results.rds"))
+
+  omic_eids <- omic_test$eid
+  meta_omic_aligned <- meta_data[match(omic_eids, meta_data$eid), ]
+
+  available_omics <- intersect(colnames(omic_test), names(omic_resid_models))
+  missing_omics <- setdiff(colnames(omic_test), available_omics)
+
+  if (length(missing_omics) > 0) {
+    message("Missing residualizer models for: ", paste(missing_omics, collapse = ", "))
+  }
+
+  omic_test_mat <- omic_test[, available_omics, drop = FALSE]
+  omic_test_resid <- omic_test_mat
+
+  for (j in seq_along(omic_test_mat)) {
+    omic_test_resid[[j]] <- apply_residualizer(
+      v = omic_test_mat[[j]],
+      covar_data = meta_omic_aligned,
+      fitted_obj = omic_resid_models[[colnames(omic_test_mat)[j]]]
+    )
+  }
+
+  omic_test_resid$eid <- omic_eids
+
+  img_test_eids <- img_test$eid
+
+  img_test <- img_test[,feature, drop=FALSE]
+  meta_img_aligned <- meta_data[match(img_test_eids, meta_data$eid), ]
+
+  img_test[[feature]] <- apply_residualizer(
+    v = img_test[[feature]],
+    covar_data = meta_img_aligned,
+    fitted_obj = img_train_fit
   )
+
+  img_test[["eid"]] <- img_test_eids
+
+  omic <- apply_normalizer(omic_test_resid, norm_omic)
+  img <- apply_normalizer(img_test, norm_img)
+
+  omic[is.na(omic)] <- 0
+  img <- na.omit(img)
+
+  keep_eids <- Reduce(intersect, list(omic$eid, img$eid, meta_data$eid))
+
+  omic <- omic[match(keep_eids, omic$eid), ]
+  img <- img[match(keep_eids, img$eid), ]
+
+  X <- omic[, setdiff(names(omic), "eid"), drop = FALSE]
+
+  keep_omics <- model$names$colnames$X
+
+  X <- X[, keep_omics, drop = FALSE]
+
+  row.names(X) <- omic$eid
+
+  y_true <- img[[feature]]
+
+  pred <- predict(model, newdata=X)
+
+  row_idx <- results$feature == feature
+
+  for (ncomp in c(1,2,3,4,5,6,7,8,9,10)){
+    y_est <- pred$predict[,,ncomp]
+
+    rmse <- sqrt(mean((y_true - y_est)^2))
+
+    ss_res <- sum((y_true - y_est)^2)
+    ss_tot <- sum(y_true^2)
+
+    r2_test <- if (ss_tot == 0) NA_real_ else 1 - ss_res / ss_tot
+
+    results[row_idx, paste0("r2_comp", ncomp)] <- r2_test
+    results[row_idx, paste0("RMSE_comp", ncomp)] <- rmse
+  }
+
 }
 
-met_test_resid$eid <- met_eids
-
-img_test_eids <- img_test$eid
-
-img_test <- img_test[,interested_feature, drop=FALSE]
-meta_img_aligned <- meta_data[match(img_test_eids, meta_data$eid), ]
-
-img_test[[interested_feature]] <- apply_residualizer(
-  v = img_test[[interested_feature]],
-  covar_data = meta_img_aligned,
-  fitted_obj = img_train_fit
-)
-
-img_test[["eid"]] <- img_test_eids
-
-
-met <- apply_normalizer(met_test_resid, norm_met)
-img <- apply_normalizer(img_test, norm_img)
-
-met[is.na(met)] <- 0
-img <- na.omit(img)
-
-keep_eids <- Reduce(intersect, list(met$eid, img$eid, meta_data$eid))
-
-met <- met[match(keep_eids, met$eid), ]
-img <- img[match(keep_eids, img$eid), ]
-
-X <- met[, setdiff(names(met), "eid"), drop = FALSE]
-
-keep_metabolites <- model$names$colnames$X
-
-X <- X[, keep_metabolites, drop = FALSE]
-
-row.names(X) <- met$eid
-
-y_true <- img[[interested_feature]]
-
-pred <- predict(model, newdata=X)
-
-y_est <- pred$predict[,,ncomp]
-
-rmse <- sqrt(mean((y_true - y_est)^2))
-
-ss_res <- sum((y_true - y_est)^2)
-ss_tot <- sum((y_true - mean(y_true))^2)
-
-r2_test <- if (ss_tot == 0) NA_real_ else 1 - ss_res / ss_tot
-
-print(r2_test)
-
-writeLines(c(
-           paste0("R2_test at ", ncomp," components: ", r2_test),
-           paste0("RMSE at ", ncomp," components: ", rmse)
-)
-  ,
-  con = paste0(interested_feature, "_r2_test.txt")
-)
+write.csv(results, paste0(cohort, "_", feature_type, "_test_results.csv"), row.names=FALSE)
