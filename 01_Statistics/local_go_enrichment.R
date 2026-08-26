@@ -1,19 +1,18 @@
-BiocManager::install("GOfuncR")
-if (!requireNamespace('BiocManager', quietly = TRUE))
-	install.packages('BiocManager')
-BiocManager::install('Homo.sapiens')
+# BiocManager::install("GOfuncR")
+# if (!requireNamespace('BiocManager', quietly = TRUE))
+# 	install.packages('BiocManager')
+# BiocManager::install('Homo.sapiens')
 
 library(GOfuncR)
 library(dplyr)
 
 Data_directory <- "Data/01_Statistics/"
 cohort <- "Single_prot_f"
-feature_type <- "volume_processed"
-feature <- "liver"
+feature_type <- "robustmeanff_processed"
+# feature_type <- "volume_processed"
+feature <- "cardiac_fat"
 
 file_path <- paste0(Data_directory, cohort, "/", feature_type, "/", feature, "_results.rds")
-out_file <- paste0(Data_directory, cohort, "/", feature_type, "/", feature, "_top_loadings.csv")
-
 
 df <- readRDS(file_path)
 
@@ -31,34 +30,43 @@ all_prots <- data.frame(
   Is_candidate = 0
 )
 
-top_150_prots <- loadings_positive_rank$feature[1:150]
-top_150_prot_input <- all_prots
-top_150_prot_input$Is_candidate[top_150_prot_input$Gene_Ids %in% top_150_prots] <- 1
-top_150_prot_input$Gene_Ids <- toupper(top_150_prot_input$Gene_Ids)
-Go_Enrich_Out<- go_enrich(top_150_prot_input, domains="biological_process", silent=T)
-Results<-Go_Enrich_Out$results
-Over_Representation<-Results[Results$FWER_overrep<=0.1,]
+n_prot <- length(loadings_sorted$feature)
 
-top_200_prots <- loadings_positive_rank$feature[1:200]
-top_200_prot_input <- all_prots
-top_200_prot_input$Is_candidate[top_200_prot_input$Gene_Ids %in% top_200_prots] <- 1
-top_200_prot_input$Gene_Ids <- toupper(top_200_prot_input$Gene_Ids)
-Go_Enrich_Out_200<- go_enrich(top_200_prot_input, domains="biological_process", silent=T)
-Results_200<-Go_Enrich_Out_200$results
-Over_Representation_200<-Results_200[Results_200$FWER_overrep<=0.1,]
+perc_5 <- ceiling(n_prot*0.05)
 
-top_150_prots <- loadings_negative_rank$feature[1:150]
-top_150_prot_input <- all_prots
-top_150_prot_input$Is_candidate[top_150_prot_input$Gene_Ids %in% top_150_prots] <- 1
-top_150_prot_input$Gene_Ids <- toupper(top_150_prot_input$Gene_Ids)
-Go_Enrich_Out_neg<- go_enrich(top_150_prot_input, domains="biological_process", silent=T)
-Results_neg<-Go_Enrich_Out_neg$results
-Over_Representation_neg<-Results_neg[Results_neg$FWER_overrep<=0.1,]
+perc_10 <- ceiling(n_prot*0.1)
 
-top_200_prots <- loadings_negative_rank$feature[1:200]
-top_200_prot_input <- all_prots
-top_200_prot_input$Is_candidate[top_200_prot_input$Gene_Ids %in% top_200_prots] <- 1
-top_200_prot_input$Gene_Ids <- toupper(top_200_prot_input$Gene_Ids)
-Go_Enrich_Out_200_neg<- go_enrich(top_200_prot_input, domains="biological_process", silent=T)
-Results_200_neg<-Go_Enrich_Out_200_neg$results
-Over_Representation_200_neg<-Results_200_neg[Results_200_neg$FWER_overrep<=0.1,]
+perc_15 <- ceiling(n_prot*0.15)
+
+enrichment <- function(sorted_loadings, prots, amount){
+  top_prots <- sorted_loadings$feature[1:amount]
+  top_prot_input <- prots
+  top_prot_input$Is_candidate[top_prot_input$Gene_Ids %in% top_prots] <- 1
+  top_prot_input$Gene_Ids <- toupper(top_prot_input$Gene_Ids)
+  Go_Enrich_Out<- go_enrich(top_prot_input, silent=T, domains=c("biological_process", "molecular_function"))
+  Results<-Go_Enrich_Out$results
+  Over_Representation<-Results[Results$FWER_overrep<=0.05,]
+  return(Over_Representation)
+}
+
+print("Positive 5 percent")
+Over_rep_pos_5 <- enrichment(loadings_positive_rank, all_prots, perc_5)
+print("Positive 10 percent")
+Over_rep_pos_10 <- enrichment(loadings_positive_rank, all_prots, perc_10)
+print("Positive 15 percent")
+Over_rep_pos_15 <- enrichment(loadings_positive_rank, all_prots, perc_15)
+
+print("Negative 5 percent")
+Over_rep_neg_5 <- enrichment(loadings_negative_rank, all_prots, perc_5)
+print("Negative 10 percent")
+Over_rep_neg_10 <- enrichment(loadings_negative_rank, all_prots, perc_10)
+print("Negative 15 percent")
+Over_rep_neg_15 <- enrichment(loadings_negative_rank, all_prots, perc_15)
+
+print("All 5 percent")
+Over_rep_5 <- enrichment(loadings_sorted, all_prots, perc_5)
+print("All 10 percent")
+Over_rep_10 <- enrichment(loadings_sorted, all_prots, perc_10)
+print("All 15 percent")
+Over_rep_15 <- enrichment(loadings_sorted, all_prots, perc_15)
+

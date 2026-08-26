@@ -2,8 +2,10 @@ library(readxl)
 library(pheatmap)
 library(dplyr)
 library(tidyr)
+generate_cluster <- function(){
+}
 
-generate_heatmap <- function(title, cohort, file, corr_type, generate_cluster=F, scale=F, rows=F,remove_prostate=F,panel=F){
+generate_heatmap <- function(title, cohort, file, corr_type, generate_cluster=F, scale=F, rows=F,remove_prostate=F,panel=F,filename){
   data_folder <- "Data/01_Statistics/"
 
   file_path <- paste0(data_folder, cohort, file)
@@ -91,7 +93,8 @@ generate_heatmap <- function(title, cohort, file, corr_type, generate_cluster=F,
   colors <- colorRampPalette(c("blue", "white", "red"))(100)
   breaks <- seq(scale[1], scale[2], length.out = 101)
 
-  show_row_names <- nrow(mat) <= 300
+  # show_row_names <- nrow(mat) <= 300
+  show_row_names <- F
   pheatmap(mat,
            cluster_rows = F,
            cluster_cols = F,
@@ -100,58 +103,145 @@ generate_heatmap <- function(title, cohort, file, corr_type, generate_cluster=F,
            color = colors,
            fontsize_row= fontsize,
            main=title,
-           show_rownames = show_row_names)
+           show_rownames = show_row_names,
+           filename=filename,
+           width=24,
+           height=12)
 }
 
 rows <- F
 scale <- c(-0.4, 0.4)
-cohort <- "Met_m/"
-
-for (feature_type in c("robustmeanff_100_processed", "vol_100_processed")){
-  clusters <- T
-  for (corr_type in c("pearson_height", "pearson", "spearman", "spearman_height")){
-      generate_heatmap( paste0("Metabolomics Male ", feature_type,"_",corr_type), cohort, paste0("corr_adj_",feature_type,".csv"), corr_type, scale=scale,  generate_cluster = clusters, rows=rows)
-        clusters <- F
-  }
-}
-
-cohort <- "Met_f/"
-for (feature_type in c("robustmeanff_100_processed", "vol_100_processed")){
-  clusters <- T
-  for (corr_type in c("pearson_height", "pearson", "spearman", "spearman_height")){
-      generate_heatmap( paste0("Metabolomics Female ", feature_type,"_",corr_type), cohort, paste0("corr_adj_",feature_type,".csv"), corr_type, scale=scale,  generate_cluster = clusters, rows=rows)
-        clusters <- F
-  }
-}
-scale <- c(-0.4, 0.4)
-# for (panel in c("Oncology", "Neurology", "Cardiometabolic", "Inflammation","Oncology II", "Neurology II", "Cardiometabolic II", "Inflammation II")){
-#   cohort <- "Single_prot_m/"
-#   generate_heatmap(paste("Proteomics Male robust meanff vibe100_processed", panel), cohort, "corr_adj_robustmeanff_100_processed.csv", scale, generate_cluster = T, rows=rows, panel=panel)
-#   generate_heatmap(paste("Proteomics Male volume vibe100_processed", panel), cohort, "corr_adj_vol_100_processed.csv", scale, generate_cluster = T, rows=rows, panel=panel)
+# cohort <- "Met_m/"
+# clusters <- T
+#
+# for (feature_type in c("robustmeanff_100_processed", "vol_100_processed")){
+#   for (corr_type in c("pearson_height", "pearson", "spearman", "spearman_height")){
+#       generate_heatmap( paste0("Metabolomics Male ", feature_type,"_",corr_type), cohort, paste0("corr_adj_",feature_type,".csv"), corr_type, scale=scale,  generate_cluster = clusters, rows=rows)
+#         clusters <- F
+#   }
 # }
-cohort <- "Single_prot_m/"
-
-for (feature_type in c("robustmeanff_100_processed", "vol_100_processed")){
-  clusters <- T
-  for (corr_type in c("pearson_height", "pearson", "spearman", "spearman_height")){
-      generate_heatmap(paste0("Proteomics Male ", feature_type,"_",corr_type), cohort, paste0("corr_adj_",feature_type,".csv"), corr_type, scale=scale,  generate_cluster = clusters, rows=rows)
-        clusters <- F
-  }
-}
-
-
-# for (panel in c("Oncology", "Neurology", "Cardiometabolic", "Inflammation","Oncology II", "Neurology II", "Cardiometabolic II", "Inflammation II")){
-#   cohort <- "Single_prot_f/"
-#   generate_heatmap(paste("Proteomics Female robust meanff vibe100_processed", panel), cohort, "corr_adj_robustmeanff_100_processed.csv", scale, generate_cluster = T, rows=rows, panel=panel)
-#   generate_heatmap(paste("Proteomics Female volume vibe100_processed", panel), cohort, "corr_adj_vol_100_processed.csv", scale, generate_cluster = T, rows=rows, panel=panel)
+#
+# cohort <- "Met_f/"
+# for (feature_type in c("robustmeanff_100_processed", "vol_100_processed")){
+#   # clusters <- T
+#   for (corr_type in c("pearson_height", "pearson", "spearman", "spearman_height")){
+#       generate_heatmap( paste0("Metabolomics Female ", feature_type,"_",corr_type), cohort, paste0("corr_adj_",feature_type,".csv"), corr_type, scale=scale,  generate_cluster = clusters, rows=rows)
+#         clusters <- F
+#   }
 # }
+# scale <- c(-0.4, 0.4)
+# # for (panel in c("Oncology", "Neurology", "Cardiometabolic", "Inflammation","Oncology II", "Neurology II", "Cardiometabolic II", "Inflammation II")){
+# #   cohort <- "Single_prot_m/"
+# #   generate_heatmap(paste("Proteomics Male robust meanff vibe100_processed", panel), cohort, "corr_adj_robustmeanff_100_processed.csv", scale, generate_cluster = T, rows=rows, panel=panel)
+# #   generate_heatmap(paste("Proteomics Male volume vibe100_processed", panel), cohort, "corr_adj_vol_100_processed.csv", scale, generate_cluster = T, rows=rows, panel=panel)
+# # }
+# cohort <- "Single_prot_m/"
+# clusters <- T
+# for (feature_type in c("robustmeanff_100_processed", "vol_100_processed")){
+#   for (corr_type in c("pearson_height", "pearson", "spearman", "spearman_height")){
+#       generate_heatmap(paste0("Proteomics Male ", feature_type,"_",corr_type), cohort, paste0("corr_adj_",feature_type,".csv"), corr_type, scale=scale,  generate_cluster = clusters, rows=rows)
+#         clusters <- F
+#   }
+# }
+#
+#
+# # for (panel in c("Oncology", "Neurology", "Cardiometabolic", "Inflammation","Oncology II", "Neurology II", "Cardiometabolic II", "Inflammation II")){
+# #   cohort <- "Single_prot_f/"
+# #   generate_heatmap(paste("Proteomics Female robust meanff vibe100_processed", panel), cohort, "corr_adj_robustmeanff_100_processed.csv", scale, generate_cluster = T, rows=rows, panel=panel)
+# #   generate_heatmap(paste("Proteomics Female volume vibe100_processed", panel), cohort, "corr_adj_vol_100_processed.csv", scale, generate_cluster = T, rows=rows, panel=panel)
+# # }
 
 cohort <- "Single_prot_f/"
+#
+# for (feature_type in c("robustmeanff_100_processed", "vol_100_processed")){
+#   # clusters <- T
+#   for (corr_type in c("pearson_height", "pearson", "spearman", "spearman_height")){
+#       generate_heatmap(paste0("Proteomics Female ", feature_type,"_",corr_type), cohort, paste0("corr_adj_",feature_type,".csv"), corr_type, scale=scale,  generate_cluster = clusters, rows=rows)
+#         clusters <- F
+#   }
+# }
+clusters <- T
+scale <- c(-0.6, 0.6)
 
 for (feature_type in c("robustmeanff_100_processed", "vol_100_processed")){
-  clusters <- T
-  for (corr_type in c("pearson_height", "pearson", "spearman", "spearman_height")){
-      generate_heatmap(paste0("Proteomics Female ", feature_type,"_",corr_type), cohort, paste0("corr_adj_",feature_type,".csv"), corr_type, scale=scale,  generate_cluster = clusters, rows=rows)
+  if (feature_type == "robustmeanff_100_processed"){
+    title_type <- "Robust Mean FF"
+    filename_type <- "Robust_meanff"
+  } else {
+    title_type <- "Volume"
+    filename_type <- "volume"
+  }
+
+  cohort <- "Single_prot_f/"
+  for (corr_type in c("pearson", "pearson_height")){
+    if (corr_type == "pearson_height"){
+      title_type_2 <- paste0(title_type, " Height adjusted")
+      filename_type_2 <- paste0(filename_type, "_height")
+    } else {
+      title_type_2 <- title_type
+      filename_type_2 <- filename_type
+    }
+      generate_heatmap(paste0("Proteomics Female ", title_type_2), cohort, paste0("corr_adj_",feature_type,".csv"), corr_type,
+                       scale=scale,  generate_cluster = clusters, rows=rows,
+                       filename=paste0("Female_Proteomics_", filename_type_2, "_white.png"))
         clusters <- F
+  }
+
+  cohort <- "Single_prot_m/"
+  for (corr_type in c("pearson", "pearson_height")){
+    if (corr_type == "pearson_height"){
+      title_type_2 <- paste0(title_type, " Height adjusted")
+      filename_type_2 <- paste0(filename_type, "_height")
+    } else {
+      title_type_2 <- title_type
+      filename_type_2 <- filename_type
+    }
+      generate_heatmap(paste0("Proteomics Male ", title_type_2), cohort, paste0("corr_adj_",feature_type,".csv"), corr_type,
+                       scale=scale,  generate_cluster = clusters, rows=rows,
+                       filename=paste0("Male_Proteomics_", filename_type_2, "_white.png"))
+        clusters <- F
+  }
+}
+
+clusters <- T
+scale <- c(-0.4, 0.4)
+
+for (feature_type in c("robustmeanff_100_processed", "vol_100_processed")){
+  if (feature_type == "robustmeanff_100_processed"){
+    title_type <- "Robust Mean FF"
+    filename_type <- "Robust_meanff"
+  } else {
+    title_type <- "Volume"
+    filename_type <- "volume"
+  }
+
+  cohort <- "Met_f/"
+  for (corr_type in c("pearson", "pearson_height")){
+    if (corr_type == "pearson_height"){
+      title_type_2 <- paste0(title_type, " Height adjusted")
+      filename_type_2 <- paste0(filename_type, "_height")
+    } else {
+      title_type_2 <- title_type
+      filename_type_2 <- filename_type
+    }
+    generate_heatmap( paste0("Metabolomics Female ", title_type_2), cohort, paste0("corr_adj_",feature_type,".csv"), corr_type,
+                      scale=scale,  generate_cluster = clusters, rows=rows,
+                      filename=paste0("Female_Metabolomics_", filename_type_2, "_white.png"))
+    clusters <- F
+  }
+  cohort <- "Met_m/"
+  for (corr_type in c("pearson", "pearson_height")){
+    if (corr_type == "pearson_height"){
+      title_type_2 <- paste0(title_type, " Height adjusted")
+      filename_type_2 <- paste0(filename_type, "_height")
+    } else {
+      title_type_2 <- title_type
+      filename_type_2 <- filename_type
+
+    }
+    generate_heatmap( paste0("Metabolomics Male ", title_type_2), cohort, paste0("corr_adj_",feature_type,".csv"), corr_type,
+                      scale=scale,  generate_cluster = clusters, rows=rows,
+                      filename=paste0("Male_Metabolomics_", filename_type_2, "_white.png"))
+    clusters <- F
   }
 }
